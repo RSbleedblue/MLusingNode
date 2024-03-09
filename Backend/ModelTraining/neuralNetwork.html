@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brain.js Basic Neural Network</title>
+</head>
+<body>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="//unpkg.com/brain.js"></script>
+    <script>
+        const correctData = [];
+        const fakeData = [];
+
+        // Function to load correct data
+        function loadCorrectData() {
+            fetch("../../News_dataset/True.csv")
+                .then(response => response.text())
+                .then(data => {
+                    // Parse CSV data
+                    const rows = data.split('\n');
+                    rows.forEach((row, index) => {
+                        if (index !== 0) { // Skip header row
+                            const columns = row.split(',');
+                            if (columns.length >= 2) { // Assuming text is in the second column
+                                correctData.push({
+                                    text: columns[0], // Assuming text is in the first column
+                                    label: 0
+                                });
+                            }
+                        }
+                    });
+                    console.log("Correct Data Loaded");
+                    loadFakeData();
+                });
+        }
+
+        // Function to load fake data
+        function loadFakeData() {
+            fetch("../../News_dataset/Fake.csv")
+                .then(response => response.text())
+                .then(data => {
+                    // Parse CSV data
+                    const rows = data.split('\n');
+                    rows.forEach((row, index) => {
+                        if (index !== 0) { // Skip header row
+                            const columns = row.split(',');
+                            if (columns.length >= 2) { // Assuming text is in the second column
+                                fakeData.push({
+                                    text: columns[0], // Assuming text is in the first column
+                                    label: 1
+                                });
+                            }
+                        }
+                    });
+                    console.log("Fake Data Loaded");
+                    processBasicNeuralNetwork();
+                });
+        }
+
+        // Function to process data and train basic neural network
+        async function processBasicNeuralNetwork() {
+            console.log("Processing Data and Training Basic Neural Network");
+            const allData = [...fakeData, ...correctData];
+            const x = allData.map(item => item.text); // Only considering text column
+            const y = allData.map(item => item.label);
+
+            // Convert text data to numeric tensors using a simple encoding method
+            const encodedX = x.map(text => text.split('').map(word => word.charCodeAt(0)));
+            const maxLen = Math.max(...encodedX.map(text => text.length));
+            const paddedX = encodedX.map(text => {
+                const padding = new Array(maxLen - text.length).fill(0);
+                return text.concat(padding);
+            });
+
+            // Create and train a basic neural network using Brain.js
+            const net = new brain.NeuralNetwork();
+            net.train(
+                allData.map((item, idx) => ({
+                    input: paddedX[idx],
+                    output: { [item.label]: 1 } // One-hot encoding
+                }))
+            );
+
+            // Evaluate the model
+            let correctPredictions = 0;
+            for (let i = 0; i < paddedX.length; i++) {
+                const output = net.run(paddedX[i]);
+                const predictedLabel = output[0] > output[1] ? 0 : 1;
+                if (predictedLabel === y[i]) {
+                    correctPredictions++;
+                }
+            }
+            const accuracy = correctPredictions / paddedX.length;
+            console.log("Basic Neural Network Test Accuracy:", accuracy);
+        }
+        loadCorrectData();
+    </script>
+</body>
+</html>
