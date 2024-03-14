@@ -98,28 +98,43 @@
             const evalResult = model.evaluate(tf.tensor2d(xTest), yTest);
             console.log('Test Loss:', evalResult[0].dataSync()[0]);
             console.log('Test Accuracy:', evalResult[1].dataSync()[0]);
+
             // Additional evaluation metrics
             const predictions = model.predict(tf.tensor2d(xTest));
+            const confusionMatrix = tf.math.confusionMatrix(yTest.argMax(-1), predictions.argMax(-1));
             const precision = tf.metrics.precision(yTest, predictions).dataSync()[0];
             const recall = tf.metrics.recall(yTest, predictions).dataSync()[0];
             const f1Score = (2 * precision * recall) / (precision + recall);
+            console.log('Confusion Matrix:');
+            confusionMatrix.print();
             console.log('Precision:', precision);
             console.log('Recall:', recall);
             console.log('F1 Score:', f1Score);
-            
+
             // Save the trained model to IndexedDB
             await model.save('indexeddb://trained_model');
             console.log("Model saved successfully");
-            const userInput = prompt('Enter a news headline to test:');
-            const userEncoded = userInput.split('').map(word => word.charCodeAt(0));
-            const userPadded = userEncoded.concat(new Array(maxLen - userEncoded.length).fill(0));
-            const userPrediction = model.predict(tf.tensor2d([userPadded]));
-            const userLabel = userPrediction.argMax(-1).dataSync()[0];
-            if (userLabel === 0) {
-                alert('The news headline is classified as TRUE.');
-            } else {
-                alert('The news headline is classified as FAKE.');
+
+            function continuousModelTesting() {
+                // Allow user input for testing
+                const userInput = prompt('Enter a news headline to test (or click "Cancel" to stop):');
+                if (userInput !== null) { // If user clicks "Cancel", stop the loop
+                    const userEncoded = userInput.split('').map(word => word.charCodeAt(0));
+                    const userPadded = userEncoded.concat(new Array(maxLen - userEncoded.length).fill(0));
+                    const userPrediction = model.predict(tf.tensor2d([userPadded]));
+                    const userLabel = userPrediction.argMax(-1).dataSync()[0];
+                    if (userLabel === 0) {
+                        alert('The news headline is classified as TRUE.');
+                    } else {
+                        alert('The news headline is classified as FAKE.');
+                    }
+                    // Call the function recursively after a delay
+                    setTimeout(continuousModelTesting, 1000); // Adjust the delay (in milliseconds) as needed
+                }
             }
+
+            // Call the function to start continuous testing
+            continuousModelTesting();
         }
         loadCorrectData();
     </script>
