@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LSTM Model</title>
+    <title>Logistic Regression</title>
 </head>
 <body>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
@@ -52,6 +52,7 @@
                     processData();
                 });
         }
+
         async function processData() {
             console.log("processData called!");
             const allData = [...fakeData, ...correctData];
@@ -67,30 +68,66 @@
                 const padding = new Array(maxLen - text.length).fill(0);
                 return text.concat(padding);
             });
-        
-            const yOnehot = tf.oneHot(tf.tensor1d(y, 'int32'), 2);
-            console.log(yOnehot);
-            const splitIndex = Math.floor(x.length * 0.8);
-            const xTrain = paddedX.slice(0, splitIndex);
-            const xTest = paddedX.slice(splitIndex);
-            const yTrain = yOnehot.slice(0, splitIndex);
-            const yTest = yOnehot.slice(splitIndex);
+
+            // Implement Logistic Regression manually
+            const numFeatures = maxLen;
+            const numClasses = 2;
+            const learningRate = 0.1;
+            const optimizer = tf.train.sgd(learningRate);
 
             const model = tf.sequential();
-            model.add(tf.layers.embedding({inputDim: maxLen, outputDim: 64, inputLength: maxLen}));
-            model.add(tf.layers.lstm({units: 64, returnSequences: false}));
-            model.add(tf.layers.dense({units: 2, activation: 'softmax'}));
-            model.compile({optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy']});
+            model.add(tf.layers.dense({
+                units: numClasses,
+                activation: 'sigmoid',
+                inputShape: [numFeatures]
+            }));
 
-            const history = await model.fit(tf.tensor2d(xTrain), yTrain, {
-                epochs: 10,
-                validationData: [tf.tensor2d(xTest), yTest],
-                shuffle: true
+            model.compile({
+                optimizer: optimizer,
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy'],
             });
-            const accuracy = history.history.acc[history.history.acc.length - 1];
-            console.log('Final Accuracy:', accuracy);
+
+            const epochs = 10;
+            const trainSize = Math.floor(x.length * 0.8);
+            const testSize = x.length - trainSize;
+
+            const xTrain = tf.tensor2d(paddedX.slice(0, trainSize)).reshape([-1, maxLen]);
+            const yTrain = tf.oneHot(tf.tensor1d(y.slice(0, trainSize), 'int32'), numClasses);
+            const xTest = tf.tensor2d(paddedX.slice(trainSize)).reshape([-1, maxLen]);
+            const yTest = tf.oneHot(tf.tensor1d(y.slice(trainSize), 'int32'), numClasses);
+
+            const history = await model.fit(xTrain, yTrain, {
+                epochs: epochs,
+                validationData: [xTest, yTest],
+            });
+
+            console.log(history);
+
+            const evalResult = model.evaluate(xTest, yTest);
+            console.log('Test Loss:', evalResult[0].dataSync()[0]);
+            console.log('Test Accuracy:', evalResult[1].dataSync()[0]);
+
+            await model.save('indexeddb://trained_model');
+            console.log("Model saved successfully");
+
+            function continuousModelTesting() {
+                const userInput = prompt('Enter a news headline to test (or click "Cancel" to stop):');
+                if (userInput !== null) { 
+                    const userEncoded = userInput.split('').map(word => word.charCodeAt(0));
+                    const userPadded = userEncoded.concat(new Array(maxLen - userEncoded.length).fill(0));
+                    const userPrediction = model.predict(tf.tensor2d([userPadded]));
+                    const userLabel = userPrediction.argMax(-1).dataSync()[0];
+                    if (userLabel === 0) {
+                        alert('The news headline is classified as TRUE.');
+                    } else {
+                        alert('The news headline is classified as FAKE.');
+                    }
+                    setTimeout(continuousModelTesting, 1000); 
+                }
+            }
+            continuousModelTesting();
         }
-        
         loadCorrectData();
     </script>
 </body>
