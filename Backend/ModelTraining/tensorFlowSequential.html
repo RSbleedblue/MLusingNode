@@ -11,19 +11,17 @@
         const correctData = [];
         const fakeData = [];
 
-        // Function to load correct data
         function loadCorrectData() {
             fetch("../../News_dataset/True.csv")
                 .then(response => response.text())
                 .then(data => {
-                    // Parse CSV data
                     const rows = data.split('\n');
                     rows.forEach((row, index) => {
-                        if (index !== 0) { // Skip header row
+                        if (index !== 0) {
                             const columns = row.split(',');
-                            if (columns.length >= 2) { // Assuming text is in the second column
+                            if (columns.length >= 2) { 
                                 correctData.push({
-                                    text: columns[0], // Assuming text is in the first column
+                                    text: columns[0], 
                                     label: 0
                                 });
                             }
@@ -34,19 +32,17 @@
                 });
         }
 
-        // Function to load fake data
         function loadFakeData() {
             fetch("../../News_dataset/Fake.csv")
                 .then(response => response.text())
                 .then(data => {
-                    // Parse CSV data
                     const rows = data.split('\n');
                     rows.forEach((row, index) => {
-                        if (index !== 0) { // Skip header row
+                        if (index !== 0) { 
                             const columns = row.split(',');
-                            if (columns.length >= 2) { // Assuming text is in the second column
+                            if (columns.length >= 2) { 
                                 fakeData.push({
-                                    text: columns[0], // Assuming text is in the first column
+                                    text: columns[0], 
                                     label: 1
                                 });
                             }
@@ -56,18 +52,15 @@
                     processData();
                 });
         }
-
-        // Function to process data
         async function processData() {
             console.log("processData called!");
             const allData = [...fakeData, ...correctData];
             tf.util.shuffle(allData);
             console.log(allData.length);
         
-            const x = allData.map(item => item.text); // Only considering text column
+            const x = allData.map(item => item.text);
             const y = allData.map(item => item.label);
         
-            // Convert text data to numeric tensors using a simple encoding method
             const encodedX = x.map(text => text.split('').map(word => word.charCodeAt(0)));
             const maxLen = Math.max(...encodedX.map(text => text.length));
             const paddedX = encodedX.map(text => {
@@ -75,23 +68,26 @@
                 return text.concat(padding);
             });
         
-            // Convert labels to one-hot encoding
             const yOnehot = tf.oneHot(tf.tensor1d(y, 'int32'), 2);
             console.log(yOnehot);
-            // Split data into training and testing sets
             const splitIndex = Math.floor(x.length * 0.8);
             const xTrain = paddedX.slice(0, splitIndex);
             const xTest = paddedX.slice(splitIndex);
             const yTrain = yOnehot.slice(0, splitIndex);
             const yTest = yOnehot.slice(splitIndex);
         
-            // Define and compile the model
             const model = tf.sequential();
+            
+            // to read this for further viva 
+             // Purpuse of arguments inside my sequential model, let know the reason and why(an elaborative explanation for this)
+             // appart from tensforflow what more models can we explore
+            // comparison with other models.
+            // Screenshots on the slides.
+
             model.add(tf.layers.dense({ units: 64, activation: 'relu', inputShape: [xTrain[0].length] }));
             model.add(tf.layers.dense({ units: 2, activation: 'softmax' }));
             model.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
         
-            // Train the model
             const epochs = 10;
             const history = await model.fit(tf.tensor2d(xTrain), yTrain, { epochs, validationData: [tf.tensor2d(xTest), yTest] });
             console.log(history);
@@ -99,26 +95,20 @@
             console.log('Test Loss:', evalResult[0].dataSync()[0]);
             console.log('Test Accuracy:', evalResult[1].dataSync()[0]);
 
-            // Additional evaluation metrics
             const predictions = model.predict(tf.tensor2d(xTest));
-            const confusionMatrix = tf.math.confusionMatrix(yTest.argMax(-1), predictions.argMax(-1));
             const precision = tf.metrics.precision(yTest, predictions).dataSync()[0];
             const recall = tf.metrics.recall(yTest, predictions).dataSync()[0];
             const f1Score = (2 * precision * recall) / (precision + recall);
-            console.log('Confusion Matrix:');
-            confusionMatrix.print();
             console.log('Precision:', precision);
             console.log('Recall:', recall);
             console.log('F1 Score:', f1Score);
 
-            // Save the trained model to IndexedDB
             await model.save('indexeddb://trained_model');
             console.log("Model saved successfully");
 
             function continuousModelTesting() {
-                // Allow user input for testing
                 const userInput = prompt('Enter a news headline to test (or click "Cancel" to stop):');
-                if (userInput !== null) { // If user clicks "Cancel", stop the loop
+                if (userInput !== null) { 
                     const userEncoded = userInput.split('').map(word => word.charCodeAt(0));
                     const userPadded = userEncoded.concat(new Array(maxLen - userEncoded.length).fill(0));
                     const userPrediction = model.predict(tf.tensor2d([userPadded]));
@@ -128,12 +118,9 @@
                     } else {
                         alert('The news headline is classified as FAKE.');
                     }
-                    // Call the function recursively after a delay
-                    setTimeout(continuousModelTesting, 1000); // Adjust the delay (in milliseconds) as needed
+                    setTimeout(continuousModelTesting, 1000); 
                 }
             }
-
-            // Call the function to start continuous testing
             continuousModelTesting();
         }
         loadCorrectData();
